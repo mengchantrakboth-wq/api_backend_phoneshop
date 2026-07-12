@@ -17,6 +17,9 @@ RUN docker-php-ext-install pdo pdo_mysql zip
 # Enable Apache rewrite
 RUN a2enmod rewrite
 
+# Laravel public directory
+RUN sed -ri -e 's!/var/www/html!/var/www/html/public!g' /etc/apache2/sites-available/*.conf
+
 # Install Composer
 COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
 
