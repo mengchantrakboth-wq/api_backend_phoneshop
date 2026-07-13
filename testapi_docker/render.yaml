@@ -1,0 +1,9 @@
+services:
+  - type: web
+    name: api-backend-phoneshop
+    env: php
+    buildCommand: |
+      composer install --no-dev --optimize-autoloader
+      php artisan key:generate
+      php artisan storage:link
+    startCommand: apache2-foreground
