@@ -8,7 +8,7 @@ use Symfony\Component\HttpFoundation\Response;
 
 class RoleMiddleware
 {
-    public function handle(Request $request, Closure $next, string $role): Response
+    public function handle(Request $request, Closure $next, ...$roles): Response
     {
         if (!$request->user()) {
             return response()->json([
@@ -17,7 +17,7 @@ class RoleMiddleware
             ], 401);
         }
 
-        if ($request->user()->role !== $role) {
+        if (!in_array($request->user()->role, $roles)) {
             return response()->json([
                 'status' => 'error',
                 'message' => 'Unauthorized entry. Access privilege mismatch'
