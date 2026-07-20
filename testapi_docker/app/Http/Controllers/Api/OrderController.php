@@ -17,14 +17,20 @@ class OrderController extends Controller
         try {
             $query = Order::with('items.product')->where('user_id', $request->user()->id);
 
-            // Admins can see everyone's orders
+            // Admins can see everyone's orders, optionally filtered to one user
             if ($request->user()->role === 'admin') {
                 $query = Order::with(['items.product', 'user']);
+
+                if ($request->filled('user_id')) {
+                    $query->where('user_id', $request->user_id);
+                }
             }
 
             return response()->json([
                 'status' => true,
-                'data' => $query->latest('date')->paginate($request->integer('per_page', 15)),
+                'data' => $query->orderBy('date', 'desc')
+                    ->orderBy('created_at', 'desc')
+                    ->paginate($request->integer('per_page', 15)),
             ]);
         } catch (\Throwable $th) {
             return response()->json([
