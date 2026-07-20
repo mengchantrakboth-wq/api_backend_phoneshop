@@ -41,10 +41,11 @@ Route::middleware('auth:sanctum')->group(function () {
     // user & Admin
     Route::middleware('role:user,admin')->group(function () {
 
+        Route::get('/users', [UserController::class, 'index']);
+        Route::get('/users/{id}', [UserController::class, 'show']);
         Route::get('/orders', [OrderController::class, 'index']);
         Route::post('/orders', [OrderController::class, 'store']);
         Route::get('/orders/{id}', [OrderController::class, 'show']);
-
     });
 
     // Admin Only
