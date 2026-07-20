@@ -13,7 +13,10 @@ class InventoryController extends Controller
     public function index(Request $request)
     {
         try {
-            $query = Inventory::with('product');
+            $query = Inventory::with('product')
+                ->whereHas('product', function ($q) {
+                    $q->whereNull('deleted_at');
+                });
 
             if ($request->boolean('low_stock')) {
                 $query->whereColumn('stock', '<=', 'min_threshold');

@@ -164,11 +164,11 @@ class ProductController extends Controller
         try {
             $product = Product::findOrFail($id);
 
-            if ($product->image) {
-                Storage::disk('public')->delete($product->image);
-            }
+            // Note: we no longer delete the image file here,
+            // since the product isn't actually being removed —
+            // just hidden. Keep the image in case it's restored.
 
-            $product->delete();
+            $product->delete(); // soft delete: sets deleted_at
 
             return response()->json([
                 'status' => true,
@@ -178,6 +178,75 @@ class ProductController extends Controller
             return response()->json([
                 'status' => false,
                 'error' => 'Product not found',
+            ], 404);
+        } catch (\Throwable $th) {
+            return response()->json([
+                'status' => false,
+                'error' => $th->getMessage(),
+            ], 500);
+        }
+    }
+
+    public function trashed(Request $request)
+    {
+        try {
+            $query = Product::onlyTrashed()->with(['category', 'inventory']);
+
+            return response()->json([
+                'status' => true,
+                'data' => $query->paginate($request->integer('per_page', 15)),
+            ]);
+        } catch (\Throwable $th) {
+            return response()->json([
+                'status' => false,
+                'error' => $th->getMessage(),
+            ], 500);
+        }
+    }
+
+    public function restore($id)
+    {
+        try {
+            $product = Product::onlyTrashed()->findOrFail($id);
+            $product->restore();
+
+            return response()->json([
+                'status' => true,
+                'message' => 'Product restored',
+                'data' => $product->load('inventory'),
+            ]);
+        } catch (ModelNotFoundException $e) {
+            return response()->json([
+                'status' => false,
+                'error' => 'Product not found in trash',
+            ], 404);
+        } catch (\Throwable $th) {
+            return response()->json([
+                'status' => false,
+                'error' => $th->getMessage(),
+            ], 500);
+        }
+    }
+
+    public function forceDelete($id)
+    {
+        try {
+            $product = Product::onlyTrashed()->findOrFail($id);
+
+            if ($product->image) {
+                Storage::disk('public')->delete($product->image);
+            }
+
+            $product->forceDelete(); // hard delete — fails if order_items still reference it
+
+            return response()->json([
+                'status' => true,
+                'message' => 'Product permanently deleted',
+            ]);
+        } catch (ModelNotFoundException $e) {
+            return response()->json([
+                'status' => false,
+                'error' => 'Product not found in trash',
             ], 404);
         } catch (\Throwable $th) {
             return response()->json([

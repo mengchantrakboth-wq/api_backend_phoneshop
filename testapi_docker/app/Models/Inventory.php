@@ -12,14 +12,16 @@ class Inventory extends Model
 
     protected $fillable = ['product_id', 'sku', 'stock', 'incoming', 'min_threshold', 'status'];
 
-    public function product(): BelongsTo
+    // Inventory model
+    public function product()
     {
-        return $this->belongsTo(Product::class);
+        return $this->belongsTo(Product::class)->withTrashed();
     }
+
+
 
     public function isLowStock(): bool
     {
         return $this->stock <= $this->min_threshold;
     }
-    
 }
