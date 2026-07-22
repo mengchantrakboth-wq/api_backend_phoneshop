@@ -8,21 +8,28 @@ use Illuminate\Http\Request;
 use Illuminate\Validation\ValidationException;
 
 class CategoryController extends Controller
+{   
+  
+   public function index(Request $request)
 {
-    public function index()
-    {
-        try {
-            return response()->json([
-                'status' => true,
-                'data' => Category::withCount('products')->get(),
-            ]);
-        } catch (\Throwable $th) {
-            return response()->json([
-                'status' => false,
-                'error' => $th->getMessage(),
-            ], 500);
+    try {
+        $query = Category::withCount('products');
+
+        if ($request->boolean('active_only')) {
+            $query->where('status', 'active');
         }
+
+        return response()->json([
+            'status' => true,
+            'data' => $query->get(),
+        ]);
+    } catch (\Throwable $th) {
+        return response()->json([
+            'status' => false,
+            'error' => $th->getMessage(),
+        ], 500);
     }
+}
 
     public function store(Request $request)
     {

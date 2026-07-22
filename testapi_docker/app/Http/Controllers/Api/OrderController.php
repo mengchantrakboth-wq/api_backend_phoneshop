@@ -120,7 +120,7 @@ class OrderController extends Controller
                     $total += $product->price * $item['quantity'];
                 }
 
-                $order->update(['total' => $total, 'status' => 'confirmed']);
+                $order->update(['total' => $total]);
 
                 return $order;
             });
