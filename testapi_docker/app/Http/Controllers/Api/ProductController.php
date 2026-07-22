@@ -13,35 +13,35 @@ use Illuminate\Validation\ValidationException;
 class ProductController extends Controller
 {
     public function index(Request $request)
-{
-    try {
-        $query = Product::with(['category', 'inventory']);
+    {
+        try {
+            $query = Product::with(['category', 'inventory']);
 
-        if ($request->filled('category_id')) {
-            $query->where('category_id', $request->category_id);
+            if ($request->filled('category_id')) {
+                $query->where('category_id', $request->category_id);
+            }
+
+            if ($request->filled('status')) {
+                $query->where('status', $request->status);
+            }
+
+            if (!$request->boolean('is_admin')) {
+                $query->whereHas('category', function ($q) {
+                    $q->where('status', 'active');
+                });
+            }
+
+            return response()->json([
+                'status' => true,
+                'data' => $query->paginate($request->integer('per_page', 15)),
+            ]);
+        } catch (\Throwable $th) {
+            return response()->json([
+                'status' => false,
+                'error' => $th->getMessage(),
+            ], 500);
         }
-
-        if ($request->filled('status')) {
-            $query->where('status', $request->status);
-        }
-
-        if (!$request->boolean('is_admin')) {
-            $query->whereHas('category', function ($q) {
-                $q->where('status', 'active');
-            });
-        }
-
-        return response()->json([
-            'status' => true,
-            'data' => $query->paginate($request->integer('per_page', 15)),
-        ]);
-    } catch (\Throwable $th) {
-        return response()->json([
-            'status' => false,
-            'error' => $th->getMessage(),
-        ], 500);
     }
-}
 
     public function store(Request $request)
     {
@@ -63,12 +63,14 @@ class ProductController extends Controller
                 : null;
 
             $product = DB::transaction(function () use ($validated, $imagePath) {
+                $productStatus = $validated['status'] ?? 'active';
+
                 $product = Product::create([
                     'category_id' => $validated['category_id'],
                     'name' => $validated['name'],
                     'price' => $validated['price'],
                     'image' => $imagePath,
-                    'status' => $validated['status'] ?? 'active',
+                    'status' => $productStatus,
                 ]);
 
                 $product->inventory()->create([
@@ -76,6 +78,8 @@ class ProductController extends Controller
                     'stock' => $validated['stock'],
                     'incoming' => $validated['incoming'] ?? 0,
                     'min_threshold' => $validated['min_threshold'] ?? 0,
+                    // Inventory status always starts in sync with the product
+                    'status' => $productStatus,
                 ]);
 
                 return $product;
@@ -98,35 +102,35 @@ class ProductController extends Controller
         }
     }
 
-   public function show(Request $request, $id)
-{
-    try {
-        $query = Product::query();
+    public function show(Request $request, $id)
+    {
+        try {
+            $query = Product::query();
 
-        if (!$request->boolean('is_admin')) {
-            $query->whereHas('category', function ($q) {
-                $q->where('status', 'active');
-            });
+            if (!$request->boolean('is_admin')) {
+                $query->whereHas('category', function ($q) {
+                    $q->where('status', 'active');
+                });
+            }
+
+            $product = $query->findOrFail($id);
+
+            return response()->json([
+                'status' => true,
+                'data' => $product->load(['category', 'inventory']),
+            ]);
+        } catch (ModelNotFoundException $e) {
+            return response()->json([
+                'status' => false,
+                'error' => 'Product not found',
+            ], 404);
+        } catch (\Throwable $th) {
+            return response()->json([
+                'status' => false,
+                'error' => $th->getMessage(),
+            ], 500);
         }
-
-        $product = $query->findOrFail($id);
-
-        return response()->json([
-            'status' => true,
-            'data' => $product->load(['category', 'inventory']),
-        ]);
-    } catch (ModelNotFoundException $e) {
-        return response()->json([
-            'status' => false,
-            'error' => 'Product not found',
-        ], 404);
-    } catch (\Throwable $th) {
-        return response()->json([
-            'status' => false,
-            'error' => $th->getMessage(),
-        ], 500);
     }
-}
 
     // Update by ID
     public function update(Request $request, $id)
@@ -150,6 +154,13 @@ class ProductController extends Controller
             }
 
             $product->update($validated);
+
+            // Keep the linked inventory's status in sync whenever the
+            // product's status changes — inventory no longer has its own
+            // independent status toggle in the admin UI.
+            if (array_key_exists('status', $validated) && $product->inventory) {
+                $product->inventory()->update(['status' => $validated['status']]);
+            }
 
             return response()->json([
                 'status' => true,
